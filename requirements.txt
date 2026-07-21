@@ -1,4 +1,4 @@
 streamlit
-huggingface_hub>=0.34.0
+groq
 gspread
 google-auth
