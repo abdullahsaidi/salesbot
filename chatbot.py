@@ -2,21 +2,14 @@
 
 import re
 
-from huggingface_hub import InferenceClient
+from groq import Groq
 
-from config import (
-    MODEL_NAME,
-    HF_PROVIDER,
-    GEN_OPTIONS,
-    DISABLE_THINKING,
-    get_hf_token,
-)
+from config import MODEL_NAME, GEN_OPTIONS, get_groq_key
 from prompts import SYSTEM_PROMPT
 from offers import get_offers_prompt
 from memory import ConversationMemory
 
 
-# Removes any <think>...</think> block if the model leaks one
 THINK_TAG_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 
 
@@ -26,22 +19,16 @@ class SalesChatbot:
         self.memory = ConversationMemory()
         self.system_prompt = SYSTEM_PROMPT + "\n" + get_offers_prompt()
 
-        # Build the Hugging Face Inference client once and reuse it.
-        # The token is read from HF_TOKEN (env var) or Streamlit secrets.
-        token = get_hf_token()
-        if not token:
+        key = get_groq_key()
+        if not key:
             raise RuntimeError(
-                "No Hugging Face token found. Set HF_TOKEN as an environment "
-                "variable, or add it to Streamlit secrets as HF_TOKEN."
+                "No Groq API key found. Set GROQ_API_KEY as an environment "
+                "variable, or add it to Streamlit secrets as GROQ_API_KEY."
             )
 
-        self.client = InferenceClient(
-            provider=HF_PROVIDER,   # "auto" -> HF picks a provider for Qwen3-8B
-            api_key=token,
-        )
+        self.client = Groq(api_key=key)
 
     def chat(self, user_message):
-        """Receive a user message and return the chatbot response."""
         self.memory.add_user_message(user_message)
 
         messages = [{"role": "system", "content": self.system_prompt}]
@@ -50,8 +37,18 @@ class SalesChatbot:
         try:
             assistant_message = self._call_model(messages)
         except Exception as e:
-            # Don't save a failed turn as if the bot replied
-            self.memory.messages.pop()  # remove the user message we just added
+            self.memory.messages.pop()
+            error_text = str(e)
+
+            if "401" in error_text or "invalid_api_key" in error_text.lower():
+                return (
+                    "⚠️ مفتاح Groq غير صحيح أو ناقص.\n"
+                    "أنشئ مفتاح من https://console.groq.com/keys وحدّثه بالإعدادات.\n"
+                    f"(Auth error: {e})"
+                )
+            if "429" in error_text or "rate" in error_text.lower():
+                return "وصلنا الحد المؤقت للطلبات 🙏 جرّب بعد دقيقة."
+
             return (
                 "عذراً، صار خطأ تقني مؤقت. جرّب مرة ثانية بعد لحظات 🙏\n"
                 f"(Technical error: {e})"
@@ -61,27 +58,11 @@ class SalesChatbot:
         return assistant_message
 
     def _call_model(self, messages):
-        # Work on a copy so we never mutate the stored conversation memory.
-        request_messages = list(messages)
-
-        if DISABLE_THINKING:
-            # Qwen3's built-in soft switch: appending "/no_think" to the last
-            # user turn tells the model to skip its internal reasoning step.
-            # This works across all Hugging Face inference providers without
-            # any provider-specific parameter.
-            last = dict(request_messages[-1])
-            last["content"] = last["content"] + " /no_think"
-            request_messages[-1] = last
-
-        # OpenAI-compatible chat completion call (via huggingface_hub).
         response = self.client.chat.completions.create(
             model=MODEL_NAME,
-            messages=request_messages,
+            messages=messages,
             **GEN_OPTIONS,
         )
-
         content = response.choices[0].message.content
-
-        # Safety net: strip any leaked thinking block and whitespace
         content = THINK_TAG_RE.sub("", content).strip()
         return content
