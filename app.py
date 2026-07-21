@@ -1,18 +1,18 @@
 # app.py
+import uuid
 
 import streamlit as st
 
 from chatbot import SalesChatbot
 from config import FIRST_MESSAGE, get_hf_token
+from storage import save_turn
 
 
 st.set_page_config(page_title="Zain Sales Bot", page_icon="🤖")
 
 st.title("🤖 Zain Sales Bot")
 
-# ---- Make sure a Hugging Face token is configured before doing anything ----
-# On Streamlit Cloud you add it under: App settings -> Secrets  (as HF_TOKEN).
-# Locally you can `export HF_TOKEN=...` before running.
+
 if not get_hf_token():
     st.error(
         "⚠️ No Hugging Face token found.\n\n"
@@ -22,7 +22,16 @@ if not get_hf_token():
     )
     st.stop()
 
+
+# Generate a unique ID for this conversation once.
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
+
 # Create the chatbot once per session (after we know the token exists).
+if "chatbot" not in st.session_state:
+    st.session_state.chatbot = SalesChatbot()
+
+
 if "chatbot" not in st.session_state:
     st.session_state.chatbot = SalesChatbot()
 
@@ -35,10 +44,12 @@ if "messages" not in st.session_state:
 with st.sidebar:
     if st.button("🔄 محادثة جديدة / New chat"):
         st.session_state.chatbot = SalesChatbot()
+        st.session_state.session_id = str(uuid.uuid4())  # new chat= new id
         st.session_state.messages = [
             {"role": "assistant", "content": FIRST_MESSAGE}
         ]
         st.rerun()
+
 
 # Display conversation history
 for message in st.session_state.messages:
@@ -60,3 +71,4 @@ if user_input:
         st.write(response)
 
     st.session_state.messages.append({"role": "assistant", "content": response})
+    save_turn(st.session_state.session_id, user_input, response)
