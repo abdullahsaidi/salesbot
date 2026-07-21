@@ -4,7 +4,7 @@ import uuid
 import streamlit as st
 
 from chatbot import SalesChatbot
-from config import FIRST_MESSAGE, get_hf_token
+from config import FIRST_MESSAGE, get_groq_key
 from storage import save_turn
 
 
@@ -13,12 +13,12 @@ st.set_page_config(page_title="Zain Sales Bot", page_icon="🤖")
 st.title("🤖 Zain Sales Bot")
 
 
-if not get_hf_token():
+if not get_groq_key():
     st.error(
-        "⚠️ No Hugging Face token found.\n\n"
-        "Add a secret named **HF_TOKEN** in your Streamlit Cloud app settings "
-        "(App → Settings → Secrets), or set the HF_TOKEN environment variable "
-        "when running locally. See the setup notes for step-by-step help."
+        "⚠️ No Groq API key found.\n\n"
+        "Add a secret named **GROQ_API_KEY** in your Streamlit Cloud app settings "
+        "(App → Settings → Secrets), or set the GROQ_API_KEY environment variable "
+        "when running locally."
     )
     st.stop()
 
