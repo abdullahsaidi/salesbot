@@ -11,7 +11,7 @@ from memory import ConversationMemory
 
 
 THINK_TAG_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
-
+EMPTY_FALLBACK = "لحظة، ممكن تعيد صياغة رسالتك؟ 🙏"
 
 class SalesChatbot:
 
@@ -54,6 +54,10 @@ class SalesChatbot:
                 f"(Technical error: {e})"
             )
 
+        if not assistant_message:
+            self.memory.messages.pop()
+            return EMPTY_FALLBACK
+
         self.memory.add_assistant_message(assistant_message)
         return assistant_message
 
@@ -63,6 +67,6 @@ class SalesChatbot:
             messages=messages,
             **GEN_OPTIONS,
         )
-        content = response.choices[0].message.content
+        content = response.choices[0].message.content or ""
         content = THINK_TAG_RE.sub("", content).strip()
         return content
