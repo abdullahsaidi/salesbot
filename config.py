@@ -21,7 +21,8 @@ GEN_OPTIONS = {
     "temperature": 0.4,
     "top_p": 0.8,
     # Cap on the length of a single reply (keeps sales answers short & fast):
-    "max_tokens": 256,
+    "max_tokens": 1024,
+    "reasoning_effort": "low", 
 }
 
 # Number of conversation TURNS (user + assistant pairs) to keep in memory.
