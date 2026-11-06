@@ -1,90 +1,64 @@
-Readme · MD
-🤖 Zain Sales Bot
+# Hala — Bilingual LLM Sales Chatbot
 
-A bilingual (Arabic / English) outbound sales chatbot for Zain Jordan. The assistant, "Hala" (هلا), proactively greets the customer, discovers their needs through short questions, and recommends the best-fitting mobile or home internet offer — all in a warm, natural Jordanian tone.
+An outbound sales chatbot prototype built during my internship in the Commercial Support department at **Zain Jordan**. The assistant, **"Hala" (هلا)**, starts the conversation, learns what the customer needs through short questions, and recommends the single best-fitting mobile or home-internet offer in a warm, natural Jordanian tone.
 
-Powered by Qwen3-8B running on Hugging Face Inference Providers, so it needs no local GPU and deploys for free on Streamlit Cloud with a shareable public link.
+> **Note:** the offers in `offers.py` are **fictional placeholders** created for this prototype. They are not real Zain prices or plans.
 
-Model: Qwen/Qwen3-8B
+## Features
 
-✨ Features
-Bilingual & Arabizi-aware — replies in Arabic to Arabic, English to English, and understands Arabic written in Latin letters (e.g. shu el 3orood).
-Proactive sales flow — greets first, then moves through Hook → Discover → Recommend → Close, one short question at a time.
-Grounded recommendations — only suggests real offers defined in offers.py; never invents prices, discounts, or bundles.
-Objection handling — responds to "it's expensive", "I already have a plan", and "maybe later", and backs off politely after two refusals.
-Conversation memory — keeps the last several turns so the chat stays coherent without losing its instructions.
-Fast, no-GPU inference — Qwen3's "thinking mode" is disabled for quick replies, with a safety net that strips any leaked reasoning.
-📁 Project structure
-File	Purpose
-app.py	Streamlit web interface (the chat UI).
-main.py	Command-line version of the chatbot.
-chatbot.py	Core logic: calls Qwen3-8B via Hugging Face and manages a turn.
-config.py	Model, generation settings, and the token loader.
-prompts.py	The "Hala" system prompt (role, language rules, sales flow).
-offers.py	The catalog of mobile & internet offers.
-memory.py	Trims conversation history by whole turns.
-requirements.txt	Python dependencies.
-.streamlit/secrets.toml.example	Template for your local token file.
-🔑 Prerequisites: a Hugging Face token
+- **Arabic, English and Arabizi**: replies in the customer's language, understands Arabic written in Latin letters (e.g. *shu el 3orood*), and never mixes two languages in one message.
+- **Guided sales flow**: Hook → Discover → Recommend → Close, asking one short question per message.
+- **Grounded recommendations**: the bot only recommends offers from the catalog and matches them to the customer using offer tags (budget, usage, household). It never invents prices, discounts or bundles.
+- **Objection handling**: handles "it's expensive", competitor comparisons, existing-plan upgrades and "maybe later", and backs off politely after two refusals.
+- **Conversation memory**: keeps the last turns, trimmed by whole user/assistant pairs so the context stays coherent.
+- **Guardrails**: no personal data collection, hands support questions to the support line, strips leaked `<think>` reasoning, and falls back gracefully on API errors and rate limits.
+- **Conversation logging**: every turn is saved to Google Sheets (timestamp, session ID, user message, bot reply) for review and prompt iteration.
 
-The app authenticates with one Hugging Face token that belongs to you, the owner — the people you share the app with do not need an account or token.
+## Tech stack
 
-Sign up (free) at huggingface.co.
-Open Settings → Access Tokens.
-Create a token (type Read is enough) and copy it — it starts with hf_....
+Python · Streamlit · Groq API (`openai/gpt-oss-120b`) · Prompt engineering · Google Sheets API (gspread)
 
-⚠️ Never commit your real token to GitHub. The included .gitignore already excludes .streamlit/secrets.toml for this reason.
+## Project structure
 
-💻 Run locally
+| File | Purpose |
+|---|---|
+| `app.py` | Streamlit chat interface |
+| `main.py` | Command-line version of the chatbot |
+| `chatbot.py` | Core logic: builds the prompt, calls the model through Groq, handles errors |
+| `prompts.py` | Hala's system prompt: role, language rules, sales flow, objection handling, examples |
+| `offers.py` | Catalog of (fictional) mobile and internet offers, with tags used for matching |
+| `memory.py` | Conversation history, trimmed by whole turns |
+| `storage.py` | Logs each conversation turn to Google Sheets |
+| `config.py` | Model name, generation settings, first message, API key loader |
 
-Install dependencies:
+## Run locally
 
-bash
+```bash
 pip install -r requirements.txt
+```
 
-Provide your token, then launch. Pick the option for your shell:
+Set your Groq API key (free at [console.groq.com](https://console.groq.com/keys)) as an environment variable, or put it in `.streamlit/secrets.toml`:
 
-Option A — a secrets file (recommended, set it once): Copy .streamlit/secrets.toml.example to .streamlit/secrets.toml and put your token inside:
+```toml
+GROQ_API_KEY = "your_groq_key"
+```
 
-HF_TOKEN = "hf_your_token_here"
+Then start the web app:
 
-Then just run:
-
-bash
+```bash
 streamlit run app.py
+```
 
-Option B — an environment variable (per session):
+or the command-line version:
 
-bash
-# Windows (CMD):        set HF_TOKEN=hf_your_token_here
-# Windows (PowerShell): $env:HF_TOKEN="hf_your_token_here"
-# macOS / Linux:        export HF_TOKEN="hf_your_token_here"
-streamlit run app.py
+```bash
+python main.py
+```
 
-The app opens at http://localhost:8501. Command-line version instead: set the token the same way, then python main.py.
+**Optional: Google Sheets logging.** Add a Google service-account JSON to `.streamlit/secrets.toml` under `[gcp_service_account]` and share a sheet named `sales_chatbot_logs` with that service account. Without it, the chat works normally and logging is skipped.
 
-🚀 Deploy on Streamlit Cloud (public link)
-Push this project to a public GitHub repo (without secrets.toml).
-Go to share.streamlit.io and sign in with GitHub.
-Create app → select your repo → set Main file path to app.py.
-Open Advanced settings → Secrets and paste:
-   HF_TOKEN = "hf_your_token_here"
-Click Deploy. You'll get a public URL like https://your-app.streamlit.app that anyone can open in a browser — no install, no login, no token needed on their side.
+`.streamlit/secrets.toml` is listed in `.gitignore`, so keys are never committed.
 
-To update the token later: App → Settings → Secrets, edit it, and reboot.
+## Configuration
 
-⚙️ Configuration
-
-Everything tunable lives in config.py:
-
-MODEL_NAME — the Hugging Face model id (Qwen/Qwen3-8B).
-HF_PROVIDER — "auto" lets Hugging Face pick a backend; you can pin one (e.g. "together", "cerebras") for more consistent latency.
-GEN_OPTIONS — sampling settings: temperature, top_p, and max_tokens.
-MAX_TURNS — how many user+assistant pairs to keep in memory.
-FIRST_MESSAGE — the opening line Hala sends.
-
-To change the offers themselves, edit offers.py. To change Hala's personality or sales rules, edit prompts.py.
-
-📝 Notes
-The Hugging Face free tier includes a small monthly inference credit — fine for demos and small teams. Heavy usage may need a PRO account or your own provider key.
-A public Streamlit link is open to anyone who has it. Restricting access to specific emails requires a paid Streamlit plan.
+Everything tunable lives in `config.py`: `MODEL_NAME`, sampling options (`temperature`, `top_p`, `max_tokens`), `MAX_TURNS` for memory length, and `FIRST_MESSAGE`. Edit `offers.py` to change the catalog and `prompts.py` to change Hala's personality or sales rules.
